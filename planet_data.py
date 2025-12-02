@@ -1,4 +1,9 @@
-# Planet data using ONLY lists
+"""
+Block Comment: Solar System Data
+-------------------------------
+This 2D list stores basic information about the eight major planets
+in our solar system.
+"""
 # Format: [name, moon_count, atmosphere, has_life, distance_from_sun_million_km]
 
 planets = [
