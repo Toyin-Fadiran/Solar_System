@@ -392,6 +392,69 @@ Before archiving the MVP, retain the following:
 
 
 =================================================================================================
+---
+
+## 15. Future Work: Phase 2 Automation Architecture
+
+While the MVP proved the viability of the local toolchain, executing each stage via manual terminal commands and file handoffs introduces operational friction. The next phase of development focuses on **eliminating manual orchestration steps** by wrapping the pipeline in a hybrid **Java + Python (FastAPI)** service architecture.
+
+> **Architectural Goal:** Transition from a manually triggered CLI workflow to an automated, state-managed pipeline while preserving the strict separation between deterministic timing logic and AI-driven linguistic tasks.
+
+### 15.1 Hybrid System Architecture
+
+Rather than forcing Java to handle native machine learning dependencies or forcing Python scripts to manage enterprise job orchestration, the Phase 2 architecture divides responsibilities across three layers:
+
+| Layer | Technology | Core Responsibilities |
+| :--- | :--- | :--- |
+| **Orchestration & State Backend** | Java (Spring Boot) | Workflow state machine, job scheduling, artifact lifecycle management, retry policies, and review UI/API delivery. |
+| **AI & Linguistic Microservice** | Python (FastAPI) | Exposes asynchronous REST endpoints for Unicode cleaning, word-to-card segmentation, Ollama LLM batch translation, and timestamp validation. |
+| **Programmatic CLI Execution** | `ProcessBuilder` / `subprocess` | Executes heavy binary and CLI tools (`ffmpeg`, `ctc-forced-aligner`, local model runners) programmatically with strict timeout, logging, and exit-code capture. |
+
+### 15.2 Removing Manual Bottlenecks
+
+The automated pipeline replaces manual terminal interventions with programmatic workflows:
+
+1. **Automated Media Ingestion & Audio Extraction:**
+   * Instead of manually preparing `.wav` files, the backend ingests the source video and programmatically invokes `ffmpeg` via subprocess execution to extract normalized 16kHz mono audio directly into a job-specific workspace.
+2. **Programmatic Forced Alignment:**
+   * The FastAPI service (or Java `ProcessBuilder` worker) constructs and executes the `ctc-forced-aligner` CLI command dynamically, capturing `stdout`/`stderr` streams, verifying zero-exit status, and automatically running the `check_timestamps.py` diagnostic logic before advancing the job state.
+3. **API-Driven Card Generation & Translation:**
+   * Once word-level JSON emissions are verified, the Java orchestrator triggers the FastAPI `/segment` and `/translate` endpoints.
+   * FastAPI manages the sliding-window requests to the local Ollama HTTP API, enforces structured JSON schema validation, and writes incremental checkpoints without manual script invocation.
+4. **Automated Invariant Verification:**
+   * Before marking a job ready for human review, an automated validation step compares the generated English `.srt` against the original Yorùbá draft `.srt` to mathematically verify that 100% of subtitle IDs and timestamp intervals remain identical.
+
+### 15.3 Target Automated Workflow
+
+```text
+[Video + Raw Transcript Input]
+              │
+              ▼
+┌───────────────────────────────────────────┐
+│        Java Backend Orchestrator          │
+│  (Job State, File Versioning, Scheduling) │
+└─────────────┬─────────────────────────────┘
+              │ REST API Calls (JSON)
+              ▼
+┌───────────────────────────────────────────┐
+│         FastAPI Processing Service        │
+│  • Unicode Normalization (unicodedata)    │
+│  • Subprocess CLI: ctc-forced-aligner     │
+│  • Word-to-Card Segmentation              │
+│  • Ollama Batch Translation & Checkpoints │
+│  • Structural & Timestamp Integrity Check │
+└─────────────┬─────────────────────────────┘
+              │
+              ▼
+[Verified Draft English .srt + Full-Context Reference]
+              │
+              ▼
+[Human-in-the-Loop Final Polish & YouTube Delivery]
+```
+
+> **Engineering Decision:** Automate all file movement, CLI execution, checkpointing, and structural validation through the Java/FastAPI pipeline so human effort is reserved exclusively for final semantic review.
+>
+> ===================================================================================================================
 Solar System
 
 A simple Python console program that lets users explore basic information about the planets in our Solar System. This project demonstrates foundational Python concepts such as lists, functions, modular programming, user input handling, and basic graphics using the turtle module.
